@@ -9,10 +9,17 @@ logger = logging.getLogger(__name__)
 
 def _log_supabase_error(operation, error):
     code = getattr(error, "code", None)
-    safe_code = code if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,32}", code) else "unavailable"
+    if isinstance(code, int) and 100 <= code <= 599:
+        safe_code = f"HTTP_{code}"
+    elif isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,32}", code):
+        safe_code = code
+    else:
+        safe_code = "unavailable"
     message = str(getattr(error, "message", "")).lower()
 
-    if "schema cache" in message or "could not find" in message:
+    if "json could not be generated" in message:
+        safe_message = "Supabase returned a non-standard error response; response body suppressed."
+    elif "schema cache" in message or "could not find" in message:
         safe_message = "PostgREST could not resolve a requested table or column."
     elif "row-level security" in message or "row level security" in message:
         safe_message = "A row-level security policy rejected the operation."
@@ -76,7 +83,11 @@ def teacher_login(username, password):
 
 
 def get_all_students():
-    response = supabase.table('students').select("*").execute()
+    try:
+        response = supabase.table('students').select("*").execute()
+    except Exception as error:
+        _log_supabase_error("get_all_students", error)
+        raise
     return response.data
 
 def create_student(new_name, face_embedding=None, voice_embedding=None):
