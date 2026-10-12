@@ -12,11 +12,16 @@ from src.database.db import get_all_students, create_student, get_student_subjec
 import time
 
 from src.components.dialog_enroll import enroll_dialog
+from src.components.dialog_auto_enroll import auto_enroll_dialog
 from src.components.subject_card import subject_card
 
 def student_dashboard():
     student_data = st.session_state.student_data
     student_id = student_data['student_id']
+    join_code = st.query_params.get('join-code')
+    if join_code:
+        auto_enroll_dialog(join_code)
+
     c1, c2 = st.columns(2, vertical_alignment='center', gap='xxlarge')
     with c1:
         header_dashboard()
@@ -104,6 +109,7 @@ def student_screen():
     with c2:
         if st.button("Go back to Home", type='secondary', key='loginbackbtn', shortcut="control+backspace"):
             st.session_state['login_type'] = None
+            st.query_params.clear()
             st.rerun()
 
     st.header('Login using FaceID', text_alignment='center')
