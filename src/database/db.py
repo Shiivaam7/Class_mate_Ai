@@ -1,5 +1,35 @@
 from src.database.config import supabase
 import bcrypt
+import logging
+import re
+
+
+logger = logging.getLogger(__name__)
+
+
+def _log_supabase_error(operation, error):
+    code = getattr(error, "code", None)
+    safe_code = code if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,32}", code) else "unavailable"
+    message = str(getattr(error, "message", "")).lower()
+
+    if "schema cache" in message or "could not find" in message:
+        safe_message = "PostgREST could not resolve a requested table or column."
+    elif "row-level security" in message or "row level security" in message:
+        safe_message = "A row-level security policy rejected the operation."
+    elif "permission denied" in message or "insufficient privilege" in message:
+        safe_message = "Database permissions rejected the operation."
+    elif "duplicate key" in message or "unique constraint" in message:
+        safe_message = "A unique constraint rejected the row."
+    elif "foreign key" in message:
+        safe_message = "A foreign-key constraint rejected the row."
+    elif "null value" in message or "not-null constraint" in message:
+        safe_message = "A required database field was missing."
+    elif "invalid input syntax" in message or "datatype mismatch" in message:
+        safe_message = "A value did not match the database column type."
+    else:
+        safe_message = "Supabase request failed; server details suppressed."
+
+    logger.error("Supabase %s failed (code=%s): %s", operation, safe_code, safe_message)
 
 
 
@@ -12,7 +42,11 @@ def check_pass(pwd, hashed):
 
 def check_teacher_exists(username):
     # Check for unique username, returns false when username is already taken
-    response = supabase.table("teachers").select("username").eq("username", username).execute()
+    try:
+        response = supabase.table("teachers").select("username").eq("username", username).execute()
+    except Exception as error:
+        _log_supabase_error("check_teacher_exists", error)
+        raise
     return len(response.data) > 0 
 
 
@@ -20,12 +54,20 @@ def check_teacher_exists(username):
 def create_teacher(username, password, name):
 
     data = { "username" : username, "password": hash_pass(password), "name": name}
-    response = supabase.table("teachers").insert(data).execute()
+    try:
+        response = supabase.table("teachers").insert(data).execute()
+    except Exception as error:
+        _log_supabase_error("create_teacher", error)
+        raise
     return response.data
 
 
 def teacher_login(username, password):
-    response = supabase.table("teachers").select("*").eq("username", username).execute()
+    try:
+        response = supabase.table("teachers").select("*").eq("username", username).execute()
+    except Exception as error:
+        _log_supabase_error("teacher_login", error)
+        raise
     if response.data:
         teacher = response.data[0]
         if check_pass(password, teacher['password']):

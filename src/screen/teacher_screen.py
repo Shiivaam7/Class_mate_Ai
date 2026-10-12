@@ -341,16 +341,16 @@ def teacher_screen_login():
 def register_teacher(teacher_username, teacher_name, teacher_pass, teacher_pass_confirm):
     if not teacher_username or not teacher_name or not teacher_pass:
         return False, "All Fields are required!"
-    if check_teacher_exists(teacher_username):
-        return False, "Username already taken"
     if teacher_pass != teacher_pass_confirm:
         return False, "Password doesn't match"
     
     try:
+        if check_teacher_exists(teacher_username):
+            return False, "Username already taken"
         create_teacher(teacher_username, teacher_pass, teacher_name)
         return True, "Sucessfully Created! Login Now"
-    except Exception as e:
-        return False, "Unexpected Error!"
+    except Exception:
+        return False, "Registration failed. Check the app log for a safe Supabase diagnostic."
     
 
 def teacher_screen_register():
